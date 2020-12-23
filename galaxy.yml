@@ -1,0 +1,17 @@
+namespace: itd27m01
+name: oci
+description: Missing items for Oracle Cloud Infrastructure
+version: 0.1.1
+readme: README.md
+authors:
+  - ITD27M01 (https://github.com/itd27m01)
+license_file: LICENSE
+tags:
+  - oci
+  - cloud
+repository: https://github.com/itd27m01/ansible-oci-collection
+homepage: https://github.com/itd27m01/ansible-oci-collection
+issues: https://github.com/itd27m01/ansible-oci-collection/issues
+build_ignore:
+  - '*.tar.gz'
+  - '*.pyc'
