@@ -1,0 +1,33 @@
+name: 'publish'
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  ansible:
+    name: 'Publish Ansible colleciton'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ 3.8 ]
+
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@master
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Ansible Python dependencies
+        run: |
+          pip3 install 'ansible>=2.10'
+      - name: Build Collection artifact
+        run: |
+          ansible-galaxy collection build
+      - name: Publish Collection version
+        run: |
+          ansible-galaxy collection publish ./itd27m01-oci-*.tar.gz --token=${{ secrets.ANSIBLE_GALAXY_TOKEN }}
