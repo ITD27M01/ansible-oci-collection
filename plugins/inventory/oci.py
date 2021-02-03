@@ -222,6 +222,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             "user": None,
             "fingerprint": None,
             "key_file": None,
+            "key_content": None,
             "tenancy": None,
             "region": None,
             "pass_phrase": None,
@@ -294,22 +295,45 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         return "public_ip"
 
     def read_config(self):
+        """
+        To unify different tools (oci-cli, ortu, ansible, terraform), I'm using the following doc
+        https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/clienvironmentvariables.htm#CLI_Environment_Variables
+        :return: None
+        """
+        oci_user = os.environ.get("OCI_CLI_USER")
+        oci_fingerprint = os.environ.get("OCI_CLI_FINGERPRINT")
+        oci_tenancy = os.environ.get("OCI_CLI_TENANCY")
+        oci_region = os.environ.get("OCI_CLI_REGION")
+        oci_key_file = os.environ.get("OCI_CLI_KEY_FILE")
+        oci_key_content = os.environ.get("OCI_CLI_KEY_CONTENT")
 
-        self._get_config_file()
-        # Read values from config file
-        if os.path.isfile(to_bytes(self.params["config_file"])):
-            self.config = oci.config.from_file(
-                file_location=self.params["config_file"],
-                profile_name=self.params["profile"],
-            )
+        if oci_user and oci_fingerprint and oci_tenancy and oci_region and (oci_key_file or oci_key_content):
+            self.params["user"] = oci_user
+            self.params["fingerprint"] = oci_fingerprint
+            self.params["tenancy"] = oci_tenancy
+            self.params["region"] = oci_region
 
-        self.config["additional_user_agent"] = (
+            if oci_key_file:
+                self.params["key_file"] = oci_key_file
+            elif oci_key_content:
+                self.params["key_content"] = oci_key_content
+
+        else:
+            self._get_config_file()
+            # Read values from config file
+            if os.path.isfile(to_bytes(self.params["config_file"])):
+                self.config = oci.config.from_file(
+                    file_location=self.params["config_file"],
+                    profile_name=self.params["profile"],
+                )
+
+            for setting in self.config:
+                self.params[setting] = self.config[setting]
+
+        self.params["additional_user_agent"] = (
                 oci_config_utils.inventory_agent_name + oci_version.__version__
         )
-        self.debug(self.config["additional_user_agent"])
-
-        for setting in self.config:
-            self.params[setting] = self.config[setting]
+        self.debug(self.params["additional_user_agent"])
 
     def read_settings_config(self, boolean_options, dict_options):
         if self.settings_config.has_section("oci"):
