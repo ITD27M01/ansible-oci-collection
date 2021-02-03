@@ -1,7 +1,7 @@
 namespace: itd27m01
 name: oci
 description: Missing items for Oracle Cloud Infrastructure
-version: 0.2.0
+version: 0.3.0
 readme: README.md
 authors:
   - ITD27M01 (https://github.com/itd27m01)
