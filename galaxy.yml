@@ -10,7 +10,7 @@ tags:
   - oci
   - cloud
 dependencies:
-  "oracle.oci": "2.30.0"
+  "oracle.oci": "2.14.0"
 repository: https://github.com/itd27m01/ansible-oci-collection
 homepage: https://github.com/itd27m01/ansible-oci-collection
 issues: https://github.com/itd27m01/ansible-oci-collection/issues
