@@ -13,8 +13,7 @@ requirements:
 
 short_description: Look up credentials for the Windows OCI instances.
 description:
-  - Look up secrets stored in OCI Vault provided the caller
-    has the appropriate permissions to read the secret.
+  - Look up windows credentials for the instance.
   - Lookup is based on the instance's `OCID` value.
 options:
   _terms:
