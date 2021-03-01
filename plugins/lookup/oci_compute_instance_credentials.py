@@ -124,7 +124,7 @@ class LookupModule(LookupBase):
         credentials = []
         for term in terms:
             try:
-                credentials = get_instance_credentials(oci_config, term)
+                credentials.append(get_instance_credentials(oci_config, term))
                 if not credentials and missing == 'error':
                     raise AnsibleError("Failed to find instance credentials %s (ResourceNotFound)" % term)
                 elif not credentials and missing == 'warn':
@@ -133,4 +133,9 @@ class LookupModule(LookupBase):
             except exceptions.ServiceError as e:
                 raise AnsibleError("Failed to retrieve instance credentials: %s" % to_native(e)) from e
 
-        return credentials
+        if kwargs.get('join'):
+            joined_credentials = list()
+            joined_credentials.append(''.join(credentials))
+            return joined_credentials
+        else:
+            return credentials
