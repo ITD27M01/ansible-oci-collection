@@ -1,13 +1,15 @@
 # Copyright: (c) 2020, Igor Tiunov <igortiunov@gmail.com>
 # MIT (see LICENSE or https://spdx.org/licenses/MIT.html)
 
-from ansible.errors import AnsibleError
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
+
 from base64 import b64decode
 
 try:
-    from oci import config, secrets, vault, key_management
-except ImportError:
-    raise AnsibleError("The lookup oci_secret requires oci python SDK.")
+    from oci import secrets, vault
+except ImportError as import_error:
+    raise ImportError("The lookup oci_secret requires oci python SDK.") from import_error
 
 
 def get_secrets_client(oci_config):
