@@ -1,34 +1,27 @@
 # Copyright: (c) 2020, Igor Tiunov <igortiunov@gmail.com>
 # MIT (see LICENSE or https://spdx.org/licenses/MIT.html)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 DOCUMENTATION = r'''
-lookup: oci_secret
+lookup: oci_compute_instance_credentials
 author:
   - Igor Tiunov <igortiunov@gmail.com>
 requirements:
   - oci
 
-short_description: Look up secrets stored in OCI Vault.
+short_description: Look up credentials for the Windows OCI instances.
 description:
   - Look up secrets stored in OCI Vault provided the caller
     has the appropriate permissions to read the secret.
-  - Lookup is based on the secret's `Name` value.
-  - Optional parameters can be passed into this lookup; `version_id` and `version_stage`
+  - Lookup is based on the instance's `OCID` value.
 options:
   _terms:
-    description: Name of the secret to look up in OCI Vault.
+    description: OCID of the instances to look up for credentials.
     required: True
   oci_profile:
     description: OCI credentials profile name.
-    required: False
-  compartment_id:
-    description: Compartment OCID of vault store.
-    required: False
-  vault_id:
-    description: Vault OCID of secret store.
     required: False
   on_missing:
     description:
@@ -50,32 +43,43 @@ options:
     choices: ['error', 'skip', 'warn']
 '''
 
-EXAMPLES = r"""
+EXAMPLES = r'''
 - name: Create a new Autonomous Database with secret password
-  oci_autonomous_database:
-      compartment_id: "{{ compartment_ocid }}"
-      cpu_core_count: "{{ cpu_core_count }}"
-      display_name: "{{ display_name }}"
-      admin_password: "{{ lookup('oci_secret', 'db_admin_password', compartment_id=compartment_id,
-                                                                    vault_id=vault_id,
-                                                                    on_missing='error') }}"
-      db_name: "{{ db_name }}"
-      data_storage_size_in_tbs: "{{ data_storage_size_in_tbs }}"
-      is_free_tier: true
-      state: 'present'
-
+  win_ping:
+  vars:
+    ansible_user: "{{ lookup('oci_compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
+    ansible_password: "{{ lookup('oci_compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
 - name: skip if secret does not exist
   debug: msg="{{ lookup('oci_secret', 'secret-not-exist', on_missing='skip')}}"
 
 - name: warn if access to the secret is denied
   debug: msg="{{ lookup('oci_secret', 'secret-denied', on_denied='warn')}}"
-"""
+'''
 
-RETURN = r"""
-_raw:
-  description:
-    Returns the value of the secret stored in in OCI Vault.
-"""
+RETURN = r'''
+instance_credentials:
+    description:
+        - InstanceCredentials resource
+    returned: on success
+    type: complex
+    contains:
+        password:
+            description:
+                - The password for the username.
+            returned: on success
+            type: string
+            sample: password_example
+        username:
+            description:
+                - The username.
+            returned: on success
+            type: string
+            sample: username_example
+    sample: {
+        "password": "password_example",
+        "username": "username_example"
+    }
+'''
 
 from ansible.errors import AnsibleError
 from ansible.module_utils.six import string_types
@@ -87,7 +91,7 @@ except ImportError as import_error:
 
 from ansible.plugins.lookup import LookupBase
 from ansible.module_utils._text import to_native
-from ansible_collections.itd27m01.oci.plugins.module_utils.oci_vault_secrets import get_secret, get_secret_data
+from ansible_collections.itd27m01.oci.plugins.module_utils.oci_instance_credentials import get_instance_credentials
 
 from os import path, environ
 
@@ -117,30 +121,16 @@ class LookupModule(LookupBase):
         self.set_options(var_options=variables, direct=kwargs)
         oci_config = self._get_oci_config()
 
-        compartment_id = self.get_option('compartment_id')
-        vault_id = self.get_option('vault_id')
-
-        secrets = []
+        credentials = []
         for term in terms:
             try:
-                secrets_list = get_secret(oci_config, compartment_id, vault_id, term)
-                if not secrets_list and missing == 'error':
-                    raise AnsibleError("Failed to find secret %s (ResourceNotFound)" % term)
-                elif not secrets_list and missing == 'warn':
+                credentials = get_instance_credentials(oci_config, term)
+                if not credentials and missing == 'error':
+                    raise AnsibleError("Failed to find instance credentials %s (ResourceNotFound)" % term)
+                elif not credentials and missing == 'warn':
                     self._display.warning('Skipping, did not find secret %s' % term)
 
-                if len(secrets_list) > 1:
-                    self._display.warning('More than one secrets found with name %s' % term)
-
-                for secret in secrets_list:
-                    secrets.append(get_secret_data(oci_config, secret))
-
             except exceptions.ServiceError as e:
-                raise AnsibleError("Failed to retrieve secret: %s" % to_native(e)) from e
+                raise AnsibleError("Failed to retrieve instance credentials: %s" % to_native(e)) from e
 
-        if kwargs.get('join'):
-            joined_secret = list()
-            joined_secret.append(''.join(secrets))
-            return joined_secret
-        else:
-            return secrets
+        return credentials
