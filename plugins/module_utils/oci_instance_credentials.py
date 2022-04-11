@@ -11,7 +11,7 @@ except ImportError as import_error:
 
 
 def get_core_client(oci_config):
-    return ComputeClient(config=oci_config)
+    return ComputeClient(config=oci_config, signer=signer)
 
 
 def get_instance_credentials(config, instance_id):

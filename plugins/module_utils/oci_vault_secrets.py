@@ -13,11 +13,11 @@ except ImportError as import_error:
 
 
 def get_secrets_client(oci_config):
-    return vault.VaultsClient(config=oci_config)
+    return vault.VaultsClient(config=oci_config, signer=signer)
 
 
 def get_secret_bundle_client(oci_config):
-    return secrets.SecretsClient(config=oci_config)
+    return secrets.SecretsClient(config=oci_config, signer=signer)
 
 
 def get_secret(oci_config, compartment_id, vault_id, secret_name):
