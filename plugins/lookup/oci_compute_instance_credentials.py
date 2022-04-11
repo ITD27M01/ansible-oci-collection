@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 DOCUMENTATION = r'''
-lookup: oci_compute_instance_credentials
+lookup: compute_instance_credentials
 author:
   - Igor Tiunov <igortiunov@gmail.com>
 requirements:
@@ -46,13 +46,8 @@ EXAMPLES = r'''
 - name: Create a new Autonomous Database with secret password
   win_ping:
   vars:
-    ansible_user: "{{ lookup('oci_compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
-    ansible_password: "{{ lookup('oci_compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
-- name: skip if secret does not exist
-  debug: msg="{{ lookup('oci_secret', 'secret-not-exist', on_missing='skip')}}"
-
-- name: warn if access to the secret is denied
-  debug: msg="{{ lookup('oci_secret', 'secret-denied', on_denied='warn')}}"
+    ansible_user: "{{ lookup('cloud.oci.compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
+    ansible_password: "{{ lookup('cloud.oci.compute_instance_credentials', 'ocid1.instance.oc1.eu-frankfurt-1.instance_id' }}"
 '''
 
 RETURN = r'''
@@ -84,13 +79,13 @@ from ansible.errors import AnsibleError
 from ansible.module_utils.six import string_types
 
 try:
-    from oci import config, exceptions
+    from oci import config, exceptions, core, auth
 except ImportError as import_error:
     raise AnsibleError("The lookup oci_secret requires oci python SDK.") from import_error
 
 from ansible.plugins.lookup import LookupBase
 from ansible.module_utils._text import to_native
-from ansible_collections.itd27m01.oci.plugins.module_utils.oci_instance_credentials import get_instance_credentials
+from ansible_collections.cloud.oci.plugins.module_utils.oci_instance_credentials import get_instance_credentials
 
 from os import path, environ
 
@@ -108,6 +103,8 @@ class LookupModule(LookupBase):
         return config.from_file(file_location=oci_config_file, profile_name=oci_config_profile)
 
     def run(self, terms, variables, **kwargs):
+        oci_config = {}
+        signer = None
 
         missing = kwargs.get('on_missing', 'error').lower()
         if not isinstance(missing, string_types) or missing not in ['error', 'warn', 'skip']:
@@ -118,12 +115,16 @@ class LookupModule(LookupBase):
             raise AnsibleError('"on_denied" must be a string and one of "error", "warn" or "skip", not %s' % denied)
 
         self.set_options(var_options=variables, direct=kwargs)
-        oci_config = self._get_oci_config()
+        auth_type = environ.get("OCI_CLI_AUTH", "api_key")
+        if auth_type == "api_key":
+            oci_config = self._get_oci_config()
+        elif auth_type == "instance_principal":
+            signer = auth.signers.InstancePrincipalsSecurityTokenSigner()
 
         credentials = []
         for term in terms:
             try:
-                credentials.append(get_instance_credentials(oci_config, term))
+                credentials.append(get_instance_credentials(config=oci_config, signer=signer, term=term))
                 if not credentials and missing == 'error':
                     raise AnsibleError("Failed to find instance credentials %s (ResourceNotFound)" % term)
                 elif not credentials and missing == 'warn':

@@ -5,7 +5,7 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 DOCUMENTATION = r'''
-lookup: oci_secret
+lookup: secret
 author:
   - Igor Tiunov <igortiunov@gmail.com>
 requirements:
@@ -56,19 +56,19 @@ EXAMPLES = r"""
       compartment_id: "{{ compartment_ocid }}"
       cpu_core_count: "{{ cpu_core_count }}"
       display_name: "{{ display_name }}"
-      admin_password: "{{ lookup('oci_secret', 'db_admin_password', compartment_id=compartment_id,
-                                                                    vault_id=vault_id,
-                                                                    on_missing='error') }}"
+      admin_password: "{{ lookup('cloud.oci.secret', 'db_admin_password', compartment_id=compartment_id,
+                                                                          vault_id=vault_id,
+                                                                          on_missing='error') }}"
       db_name: "{{ db_name }}"
       data_storage_size_in_tbs: "{{ data_storage_size_in_tbs }}"
       is_free_tier: true
       state: 'present'
 
 - name: skip if secret does not exist
-  debug: msg="{{ lookup('oci_secret', 'secret-not-exist', on_missing='skip')}}"
+  debug: msg="{{ lookup('cloud.oci.secret', 'secret-not-exist', on_missing='skip')}}"
 
 - name: warn if access to the secret is denied
-  debug: msg="{{ lookup('oci_secret', 'secret-denied', on_denied='warn')}}"
+  debug: msg="{{ lookup('cloud.oci.secret', 'secret-denied', on_denied='warn')}}"
 """
 
 RETURN = r"""
@@ -81,13 +81,13 @@ from ansible.errors import AnsibleError
 from ansible.module_utils.six import string_types
 
 try:
-    from oci import config, exceptions
+    from oci import config, exceptions, core, auth
 except ImportError as import_error:
     raise AnsibleError("The lookup oci_secret requires oci python SDK.") from import_error
 
 from ansible.plugins.lookup import LookupBase
 from ansible.module_utils._text import to_native
-from ansible_collections.itd27m01.oci.plugins.module_utils.oci_vault_secrets import get_secret, get_secret_data
+from ansible_collections.cloud.oci.plugins.module_utils.oci_vault_secrets import get_secret, get_secret_data
 
 from os import path, environ
 
@@ -105,6 +105,8 @@ class LookupModule(LookupBase):
         return config.from_file(file_location=oci_config_file, profile_name=oci_config_profile)
 
     def run(self, terms, variables, **kwargs):
+        oci_config = {}
+        signer = None
 
         missing = kwargs.get('on_missing', 'error').lower()
         if not isinstance(missing, string_types) or missing not in ['error', 'warn', 'skip']:
@@ -115,7 +117,12 @@ class LookupModule(LookupBase):
             raise AnsibleError('"on_denied" must be a string and one of "error", "warn" or "skip", not %s' % denied)
 
         self.set_options(var_options=variables, direct=kwargs)
-        oci_config = self._get_oci_config()
+
+        auth_type = environ.get("OCI_CLI_AUTH", "api_key")
+        if auth_type == "api_key":
+            oci_config = _get_oci_config()
+        elif auth_type == "instance_principal":
+            signer = auth.signers.InstancePrincipalsSecurityTokenSigner()
 
         compartment_id = self.get_option('compartment_id')
         vault_id = self.get_option('vault_id')
@@ -123,7 +130,7 @@ class LookupModule(LookupBase):
         secrets = []
         for term in terms:
             try:
-                secrets_list = get_secret(oci_config, compartment_id, vault_id, term)
+                secrets_list = get_secret(config=oci_config, signer=signer, compartment_id=compartment_id, vault_id=vault_id, term=term)
                 if not secrets_list and missing == 'error':
                     raise AnsibleError("Failed to find secret %s (ResourceNotFound)" % term)
                 elif not secrets_list and missing == 'warn':
@@ -133,7 +140,7 @@ class LookupModule(LookupBase):
                     self._display.warning('More than one secrets found with name %s' % term)
 
                 for secret in secrets_list:
-                    secrets.append(get_secret_data(oci_config, secret))
+                    secrets.append(get_secret_data(oci_config, signer, secret))
 
             except exceptions.ServiceError as e:
                 raise AnsibleError("Failed to retrieve secret: %s" % to_native(e)) from e
