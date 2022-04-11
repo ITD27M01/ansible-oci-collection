@@ -92,6 +92,7 @@ from os import path, environ
 
 class LookupModule(LookupBase):
     def _get_oci_config(self):
+        oci_config = {}
         oci_config_file = path.join(path.expanduser("~"), ".oci", "config")
         oci_config_profile = 'DEFAULT'
 
@@ -124,7 +125,7 @@ class LookupModule(LookupBase):
         credentials = []
         for term in terms:
             try:
-                credentials.append(get_instance_credentials(config=oci_config, signer=signer, term=term))
+                credentials.append(get_instance_credentials(oci_config, signer, term))
                 if not credentials and missing == 'error':
                     raise AnsibleError("Failed to find instance credentials %s (ResourceNotFound)" % term)
                 elif not credentials and missing == 'warn':

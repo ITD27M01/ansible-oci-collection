@@ -130,7 +130,7 @@ class LookupModule(LookupBase):
         secrets = []
         for term in terms:
             try:
-                secrets_list = get_secret(config=oci_config, signer=signer, compartment_id=compartment_id, vault_id=vault_id, term=term)
+                secrets_list = get_secret(oci_config, signer, compartment_id, vault_id, term)
                 if not secrets_list and missing == 'error':
                     raise AnsibleError("Failed to find secret %s (ResourceNotFound)" % term)
                 elif not secrets_list and missing == 'warn':

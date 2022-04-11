@@ -10,10 +10,10 @@ except ImportError as import_error:
     raise ImportError("The lookup oci_compute_instance_credentials requires oci python SDK.") from import_error
 
 
-def get_core_client(oci_config):
+def get_core_client(oci_config, signer):
     return ComputeClient(config=oci_config, signer=signer)
 
 
-def get_instance_credentials(config, instance_id):
-    core_client = get_core_client(config)
+def get_instance_credentials(config, signer, instance_id):
+    core_client = get_core_client(config, signer)
     return core_client.get_windows_instance_initial_credentials(instance_id=instance_id).data
